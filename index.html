@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chữ Ký Số ElGamal</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+</head>
+<body>
+
+<div class="header">
+  <h1>🔐 Chữ Ký Số <span>ElGamal</span></h1>
+  <p>Ký và xác nhận tính toàn vẹn của văn bản bằng hệ mật ElGamal + SHA-256</p>
+</div>
+
+<!-- ══════════════ CARD 1: KHÓA ══════════════ -->
+<div class="card">
+  <div class="sec-title">⚙️ Thiết lập khóa</div>
+
+  <div class="key-tabs">
+    <button class="key-tab-btn active" id="tab-auto" onclick="switchKeyTab('auto')">🤖 Tự động sinh</button>
+    <button class="key-tab-btn" id="tab-manual-key" onclick="switchKeyTab('manual')">✏️ Nhập thủ công</button>
+  </div>
+
+  <!-- Panel tự động -->
+  <div id="panel-auto-key">
+    <div class="size-row" style="margin-bottom:10px;">
+      <label class="size-opt">
+        <input type="radio" name="psize" value="demo" checked>
+        Demo (8–16 bit, nhanh)
+      </label>
+      <label class="size-opt">
+        <input type="radio" name="psize" value="medium">
+        Vừa (32–64 bit)
+      </label>
+      <label class="size-opt">
+        <input type="radio" name="psize" value="secure">
+        Bảo mật cao (2048–4096 bit)
+      </label>
+    </div>
+    <div id="secure-hint" style="display:none;" class="manual-key-hint">
+      ⚠️ Chế độ bảo mật cao sử dụng số nguyên tố <b>2048–4096 bit</b>. Quá trình sinh khóa có thể mất <b>vài giây đến vài phút</b> tùy thiết bị. Vui lòng chờ.
+    </div>
+  </div>
+
+  <!-- Panel nhập thủ công -->
+  <div id="panel-manual-key" style="display:none;">
+    <div class="manual-key-hint">
+      💡 <b>P</b> phải là số nguyên tố &nbsp;·&nbsp;
+         <b>A</b> phải là căn nguyên thủy nhỏ nhất của P &nbsp;·&nbsp;
+         <b>2 ≤ X ≤ P−2</b>. Nhấn <b>Áp dụng</b> sau khi nhập xong.
+    </div>
+    <div class="grid3">
+      <div class="field">
+        <label>P</label>
+        <input type="text" id="p-manual" placeholder="VD: 467" oninput="validateAManual()">
+      </div>
+      <div class="field">
+        <label>
+          A
+          <span id="a-manual-err" class="inline-err" style="display:none;"></span>
+        </label>
+        <input type="text" id="a-manual" placeholder="VD: 2" oninput="validateAManual()">
+      </div>
+      <div class="field">
+        <label>X</label>
+        <input type="text" id="x-manual" placeholder="VD: 127">
+      </div>
+    </div>
+    <div class="btn-row" style="margin-bottom:10px;">
+      <button class="btn btn-primary btn-sm" onclick="nhapKhoaThuCong()">✅ Áp dụng &amp; Tính Y</button>
+      <button class="btn btn-dark btn-sm" onclick="clearManualInputs()">🗑 Xóa ô nhập</button>
+    </div>
+  </div>
+
+  <!-- Hiển thị khóa hiện tại -->
+  <div class="grid4">
+    <div class="field">
+      <label>P</label>
+      <input type="text" id="p" readonly placeholder="—">
+    </div>
+    <div class="field">
+      <label>A</label>
+      <input type="text" id="a" readonly placeholder="—">
+    </div>
+    <div class="field">
+      <label>X <span class="key-badge secret">bí mật</span></label>
+      <input type="text" id="x" readonly placeholder="—" class="secret-field">
+    </div>
+    <div class="field">
+      <label>Y <span class="key-badge public">công khai</span></label>
+      <input type="text" id="y" readonly placeholder="—" class="public-field">
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary btn-sm" id="btn-tao-khoa" onclick="taoKhoa()">🔑 Tạo khóa ngẫu nhiên</button>
+    <button class="btn btn-dark btn-sm" onclick="xoaHet()">🗑 Xóa tất cả</button>
+  </div>
+</div>
+
+<!-- ══════════════ CARD 2: TẠO CHỮ KÝ SỐ ══════════════ -->
+<div class="card">
+  <div class="sec-title">✍️ Tạo chữ ký số</div>
+
+  <div class="sign-row">
+    <div class="sign-input-wrap">
+      <label class="field-label">Văn bản cần ký số:</label>
+      <input type="text" id="msg-ky" placeholder="Nhập văn bản cần ký...">
+    </div>
+    <div class="sign-file-wrap">
+      <label class="file-pill" id="label-file-ky" title="Chọn file .txt / .docx">
+        <input type="file" id="file-ky" accept=".txt,.docx" onchange="onFileChosen('file-ky')">
+        <span class="file-pill-icon">📂</span>
+        <span class="file-pill-text" id="txt-file-ky">Chọn file .txt / .docx</span>
+      </label>
+      <button class="btn btn-dark icon-btn" onclick="clearFile('file-ky','label-file-ky','txt-file-ky')">✕</button>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="kyso()">✍️ Ký</button>
+  </div>
+
+  <div class="two-col-result">
+    <div class="field">
+      <label>🔢 Bản tóm lược — SHA-256 Hash</label>
+      <input type="text" id="hash-display" readonly placeholder="Hash hiện sau khi ký...">
+    </div>
+    <div class="field">
+      <label>🔏 Chữ ký số là <span class="badge badge-blue" id="ky-count"></span></label>
+      <input type="text" id="chu-ky" readonly placeholder="s1, s2 hiện sau khi ký...">
+    </div>
+  </div>
+
+  <div class="btn-row" style="margin-top:8px;">
+    <button class="btn btn-success btn-sm" id="btn-export" onclick="xuatFileDaKy()" style="display:none;">
+      💾 Gắn chữ ký vào tệp &amp; tải về
+    </button>
+  </div>
+
+  <div id="export-info" class="export-info" style="display:none;">
+    <span class="export-icon">📦</span>
+    <span id="export-filename"></span>
+    <span class="export-hint">— Upload file này ở phần Xác nhận để kiểm tra</span>
+  </div>
+</div>
+
+<!-- ══════════════ CARD 3: XÁC NHẬN CHỮ KÝ SỐ ══════════════ -->
+<div class="card">
+  <div class="sec-title">🔍 Xác nhận chữ ký số</div>
+
+  <div class="verify-tabs">
+    <button class="tab-btn active" id="tab-file" onclick="switchTab('file')">📦 Từ tệp đã ký (.elgsig)</button>
+    <button class="tab-btn" id="tab-manual" onclick="switchTab('manual')">✏️ Nhập thủ công</button>
+  </div>
+
+  <!-- Tab 1: upload file .elgsig -->
+  <div id="panel-file">
+    <div class="sign-row" style="margin-top:10px;">
+      <label class="field-label" style="white-space:nowrap;">Tệp chữ ký:</label>
+      <div class="sign-file-wrap">
+        <label class="file-pill" id="label-file-sig">
+          <input type="file" id="file-sig" accept=".elgsig,.json" onchange="onSigFileChosen()">
+          <span class="file-pill-icon">📦</span>
+          <span class="file-pill-text" id="txt-file-sig">Chọn file .elgsig</span>
+        </label>
+        <button class="btn btn-dark icon-btn" onclick="clearSigFile()">✕</button>
+      </div>
+      <button class="btn btn-success btn-sm" onclick="xacNhanFile()">🔍 Xác nhận</button>
+    </div>
+  </div>
+
+  <!-- Tab 2: nhập thủ công -->
+  <div id="panel-manual" style="display:none;">
+    <div class="sign-row" style="margin-top:10px;">
+      <div class="sign-input-wrap">
+        <label class="field-label">Văn bản xác nhận:</label>
+        <input type="text" id="msg-xacnhan" placeholder="Nhập văn bản cần xác nhận...">
+      </div>
+      <div class="sign-file-wrap">
+        <label class="file-pill" id="label-file-xacnhan">
+          <input type="file" id="file-xacnhan" accept=".txt,.docx" onchange="onFileChosen('file-xacnhan')">
+          <span class="file-pill-icon">📂</span>
+          <span class="file-pill-text" id="txt-file-xacnhan">Chọn file .txt / .docx</span>
+        </label>
+        <button class="btn btn-dark icon-btn" onclick="clearFile('file-xacnhan','label-file-xacnhan','txt-file-xacnhan')">✕</button>
+      </div>
+      <button class="btn btn-success btn-sm" onclick="xacNhanThuCong()">🔍 Xác nhận</button>
+    </div>
+  </div>
+
+  <div id="verify-result" class="verify-result" style="display:none;"></div>
+</div>
+
+<div id="toast"></div>
+<script src="script.js"></script>
+</body>
+</html>
