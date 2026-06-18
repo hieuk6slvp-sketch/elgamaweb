@@ -140,7 +140,7 @@
   <div id="export-info" class="export-info" style="display:none;">
     <span class="export-icon">📦</span>
     <span id="export-filename"></span>
-    <span class="export-hint">— Upload file này ở phần Xác nhận để kiểm tra</span>
+    <span class="export-hint">— Upload file này cùng văn bản gốc ở phần Xác nhận để kiểm tra</span>
   </div>
 </div>
 
@@ -155,7 +155,25 @@
 
   <!-- Tab 1: upload file .elgsig -->
   <div id="panel-file">
+
+    <!-- Dòng văn bản gốc — thêm mới, cùng style với dòng ký -->
     <div class="sign-row" style="margin-top:10px;">
+      <div class="sign-input-wrap">
+        <label class="field-label">Văn bản gốc:</label>
+        <input type="text" id="msg-sig-doc" placeholder="Nhập văn bản gốc hoặc chọn file...">
+      </div>
+      <div class="sign-file-wrap">
+        <label class="file-pill" id="label-file-sig-doc" title="Chọn file .txt / .docx gốc">
+          <input type="file" id="file-sig-doc" accept=".txt,.docx" onchange="onFileChosen('file-sig-doc')">
+          <span class="file-pill-icon">📂</span>
+          <span class="file-pill-text" id="txt-file-sig-doc">Chọn file .txt / .docx</span>
+        </label>
+        <button class="btn btn-dark icon-btn" onclick="clearFile('file-sig-doc','label-file-sig-doc','txt-file-sig-doc')">✕</button>
+      </div>
+    </div>
+
+    <!-- Dòng file .elgsig + nút Xác nhận -->
+    <div class="sign-row" style="margin-top:6px;">
       <label class="field-label" style="white-space:nowrap;">Tệp chữ ký:</label>
       <div class="sign-file-wrap">
         <label class="file-pill" id="label-file-sig">
@@ -167,6 +185,7 @@
       </div>
       <button class="btn btn-success btn-sm" onclick="xacNhanFile()">🔍 Xác nhận</button>
     </div>
+
   </div>
 
   <!-- Tab 2: nhập thủ công -->

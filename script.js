@@ -7,7 +7,7 @@ async function sha256Hex(text) {
 }
 function hexToBigInt(hex) { return BigInt('0x' + hex); }
 
-// ── TOÁN BIGINT ──────────────────────────────────────────────────
+
 function modpowBig(base, exp, mod) {
   let r = 1n; base %= mod;
   while (exp > 0n) {
@@ -61,7 +61,7 @@ function randomBigBits(nBits) {
   let val = 0n;
   for (const b of bytes) val = (val << 8n) | BigInt(b);
   val &= (1n << BigInt(nBits)) - 1n;
-  val |= 1n << BigInt(nBits - 1);   // bật bit cao nhất (nBits-1 là number)
+  val |= 1n << BigInt(nBits - 1);
   return val;
 }
 function randomPrime(nBits) {
@@ -108,8 +108,6 @@ function smallestPrimitiveRoot(p) {
 }
 
 // ── KÝ ELGAMAL ──────────────────────────────────────────────────
-// s1 = A^K mod p
-// s2 = K^(-1) * (m - x*s1) mod (p-1)
 function Encry_S(hashHex) {
   const p = BigInt($('p').value), a = BigInt($('a').value), x = BigInt($('x').value);
   const pm1 = p - 1n, m = hexToBigInt(hashHex) % pm1;
@@ -121,9 +119,7 @@ function Encry_S(hashHex) {
   return [s1, s2];
 }
 
-// ── XÁC NHẬN ELGAMAL ────────────────────────────────────────────
-// v1 = A^m mod p    |    v2 = (y^s1 * s1^s2) mod p
-// Hợp lệ khi v1 === v2
+// ── XÁC MINH ELGAMAL ────────────────────────────────────────────
 function _verify(pair, hashHex, p, a, y) {
   const pm1 = p - 1n, m = hexToBigInt(hashHex) % pm1, [s1, s2] = pair;
   const v1  = modpowBig(a, m, p);
@@ -175,8 +171,10 @@ function showToast(msg, type = 'info', duration = 3500) {
 }
 function onFileChosen(inputId) {
   const file = $(inputId).files[0];
-  const txtId = inputId === 'file-ky' ? 'txt-file-ky' : 'txt-file-xacnhan';
-  if (file) { $(txtId).textContent = '📄 ' + file.name; $(txtId).className = 'file-pill-text chosen'; }
+  if (!file) return;
+  const txtId = 'txt-' + inputId;
+  const txtEl = $(txtId);
+  if (txtEl) { txtEl.textContent = '📄 ' + file.name; txtEl.className = 'file-pill-text chosen'; }
 }
 function clearFile(inputId, labelId, txtId) {
   $(inputId).value = '';
@@ -248,7 +246,7 @@ function nhapKhoaThuCong() {
   if (!isPrime(pBig)) { showToast('❌ P không phải số nguyên tố!', 'err'); return; }
   const minRoot = smallestPrimitiveRoot(pBig);
   if (minRoot === null || aBig !== minRoot) {
-    showToast(`❌ A không phù hợp! Căn nguyên thủy nhỏ nhất của P là ${minRoot}. Không tính được Y.`, 'err', 6000);
+    showToast(`❌ A không phù hợp! Căn nguyên thủy nhỏ nhất của P là ${minRoot}.`, 'err', 6000);
     return;
   }
   if (xBig < 2n || xBig > pBig - 2n) { showToast('❌ X phải thỏa mãn 2 ≤ X ≤ P−2!', 'err'); return; }
@@ -295,11 +293,12 @@ function resetSignArea() {
 
 // ── XÓA TẤT CẢ ──────────────────────────────────────────────────
 function xoaHet() {
-  ['p','a','x','y','msg-ky','msg-xacnhan','chu-ky','hash-display','p-manual','a-manual','x-manual']
+  ['p','a','x','y','msg-ky','msg-xacnhan','chu-ky','hash-display','p-manual','a-manual','x-manual','msg-sig-doc']
     .forEach(id => { const el = $(id); if (el) el.value = ''; });
   resetSignArea();
   clearFile('file-ky', 'label-file-ky', 'txt-file-ky');
   clearFile('file-xacnhan', 'label-file-xacnhan', 'txt-file-xacnhan');
+  clearFile('file-sig-doc', 'label-file-sig-doc', 'txt-file-sig-doc');
   clearSigFile();
   $('a-manual-err').style.display = 'none';
   showToast('🗑 Đã xóa tất cả.', 'info');
@@ -339,16 +338,30 @@ async function kyso() {
   } catch (e) { showToast('❌ Lỗi khi ký: ' + e.message, 'err'); }
 }
 
-// ── XUẤT FILE .elgsig ────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════
+//  XUẤT FILE .elgsig
+//  Chỉ lưu publicKey + signature — KHÔNG lưu message
+//  → Buộc người xác nhận phải nộp văn bản gốc thật sự
+// ══════════════════════════════════════════════════════════════════
 function xuatFileDaKy() {
   if (!currentPair) { showToast('⚠️ Chưa có chữ ký! Hãy ký văn bản trước.', 'err'); return; }
+
   const payload = {
-    version: '2.0', algorithm: 'ElGamal + SHA-256',
-    signedAt: new Date().toISOString(),
-    message: currentMsg, hash: currentHash,
-    publicKey: { p: $('p').value, a: $('a').value, y: $('y').value },
-    signature: [currentPair[0].toString(), currentPair[1].toString()]
+    version:   '2.0',
+    algorithm: 'ElGamal + SHA-256',
+    signedAt:  new Date().toISOString(),
+    // Không lưu message và hash — người xác nhận phải cung cấp văn bản gốc
+    publicKey: {
+      p: $('p').value,
+      a: $('a').value,
+      y: $('y').value
+    },
+    signature: [
+      currentPair[0].toString(),
+      currentPair[1].toString()
+    ]
   };
+
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);
   const slug = currentMsg.slice(0,10).replace(/[^a-zA-Z0-9À-ỹ]/g,'_');
@@ -360,31 +373,69 @@ function xuatFileDaKy() {
   showToast(`💾 Đã tải về: ${filename}`, 'ok', 5000);
 }
 
-// ── XÁC NHẬN TỪ FILE .elgsig ────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════
+//  XÁC NHẬN TỪ FILE .elgsig
+//
+//  Quy trình đúng:
+//    Văn bản gốc (người dùng cung cấp)
+//        ↓ SHA-256
+//       H' (hash tính tại chỗ)
+//        ↓
+//    So với chữ ký (s1, s2) và khóa công khai từ .elgsig:
+//      v1 = a^H' mod p
+//      v2 = y^s1 × s1^s2 mod p
+//      v1 == v2 → ✅ Hợp lệ
+//      v1 != v2 → ❌ Không hợp lệ (văn bản bị sửa dù 1 ký tự)
+// ══════════════════════════════════════════════════════════════════
 async function xacNhanFile() {
   const fileInput = $('file-sig');
   if (!fileInput.files.length) { showToast('⚠️ Hãy chọn file .elgsig!', 'err'); return; }
-  showToast('⏳ Đang đọc file...', 'info', 99999);
+
+  // Bước 1: Đọc file .elgsig
+  let data;
   try {
     const text = await new Promise((res, rej) => {
       const r = new FileReader();
       r.onload = e => res(e.target.result);
-      r.onerror = () => rej(new Error('Không đọc được file.'));
+      r.onerror = () => rej(new Error('Không đọc được file .elgsig.'));
       r.readAsText(fileInput.files[0], 'UTF-8');
     });
-    const data = JSON.parse(text);
-    if (!data.message || !data.publicKey || !data.signature) {
-      showToast('❌ File không đúng định dạng .elgsig!', 'err'); return;
+    data = JSON.parse(text);
+  } catch (e) { showToast('❌ Lỗi đọc file .elgsig: ' + e.message, 'err'); return; }
+
+  if (!data.publicKey || !data.signature) {
+    showToast('❌ File không đúng định dạng .elgsig!', 'err'); return;
+  }
+
+  // Bước 2: Lấy văn bản gốc từ người dùng (file hoặc ô nhập)
+  let msg;
+  try {
+    const docInput = $('file-sig-doc');
+    if (docInput && docInput.files.length > 0) {
+      showToast('⏳ Đang đọc file văn bản...', 'info', 99999);
+      msg = await readFileContent(docInput.files[0]);
+      if (!msg) { showToast('⚠️ File văn bản trống!', 'err'); return; }
+    } else {
+      const txtEl = $('msg-sig-doc');
+      msg = txtEl ? txtEl.value : '';
+      if (!msg.trim()) {
+        showToast('⚠️ Vui lòng nhập văn bản gốc hoặc chọn file!', 'err'); return;
+      }
     }
-    if (Array.isArray(data.signature[0])) {
-      showToast('❌ File định dạng cũ. Hãy ký lại!', 'err', 6000); return;
-    }
-    showToast('⏳ Đang băm & xác nhận...', 'info', 99999);
-    const { message, publicKey, signature } = data;
-    const hashHex = await sha256Hex(message);
-    const pair    = [BigInt(signature[0]), BigInt(signature[1])];
-    $('p').value = publicKey.p; $('a').value = publicKey.a; $('y').value = publicKey.y;
-    const { hopLe } = Decry_S_WithKey(pair, hashHex, publicKey.p, publicKey.a, publicKey.y);
+  } catch (e) { showToast('❌ ' + e.message, 'err'); return; }
+
+  showToast('⏳ Đang băm & xác nhận...', 'info', 99999);
+  try {
+    // Bước 3: Băm văn bản người dùng cung cấp → H'
+    const hashHex = await sha256Hex(msg);
+
+    // Bước 4: Xác minh ElGamal bằng H' (không dùng hash cũ trong file)
+    const { p, a, y } = data.publicKey;
+    const pair = [BigInt(data.signature[0]), BigInt(data.signature[1])];
+
+    $('p').value = p; $('a').value = a; $('y').value = y;
+
+    const { hopLe } = Decry_S_WithKey(pair, hashHex, p, a, y);
     showVerifyResult(hopLe);
     showToast(hopLe ? '✅ Xác nhận thành công!' : '❌ Chữ ký không hợp lệ!', hopLe ? 'ok' : 'err', 5000);
   } catch (e) { showToast('❌ Lỗi: ' + e.message, 'err'); }
